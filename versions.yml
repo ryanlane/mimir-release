@@ -1,0 +1,17 @@
+# Mimir release manifest — single source of truth for what runs in production.
+#
+# A "release" is a PR that bumps pins here. The server's update timer pulls
+# this repo, then `docker compose pull && up -d` against the pinned tags.
+# See PLAN.md §3 for the full architecture.
+#
+# Tags below must exist as GHCR image tags (server) / GitHub Release tags
+# (display-client). Placeholder values until Phase 1 CI is in place.
+
+stable:
+  server: v0.0.0          # one tag → api, web, discovery images (ghcr.io/ryanlane/mimir-*)
+  display-client: v0.0.0  # mimir-display release artifact
+
+# Optional second channel for canary devices / a test server:
+# canary:
+#   server: v0.0.0
+#   display-client: v0.0.0

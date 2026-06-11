@@ -1,0 +1,117 @@
+{
+  "folders": [
+    {
+      "name": "🚀 Release & Ops",
+      "path": "."
+    },
+    {
+      "name": "🖥️ Server (API · Web · Discovery)",
+      "path": "../mimir-server"
+    },
+    {
+      "name": "📟 Display Client (Pi)",
+      "path": "../mimir-display"
+    },
+    {
+      "name": "⚡ Display Client (Electron)",
+      "path": "../mimir-display-electron"
+    },
+    {
+      "name": "🔋 Display Client (MagTag)",
+      "path": "../mimir-display-magtag"
+    },
+    {
+      "name": "📸 Channel: Photo Frame",
+      "path": "../mimir-channel-photoframe"
+    },
+    {
+      "name": "🎵 Channel: Spotify",
+      "path": "../mimir-channel-spotify"
+    },
+    {
+      "name": "📚 Docs",
+      "path": "../mimir-docs"
+    }
+  ],
+  "settings": {
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true,
+      "**/.venv": true,
+      "**/data/uploads": true,
+      "**/build": true,
+      "**/dist": true,
+      "**/.git": true
+    },
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.pyc": true,
+      "**/.pytest_cache": true,
+      "**/.ruff_cache": true
+    },
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/.venv/**": true,
+      "**/data/uploads/**": true
+    },
+    "editor.formatOnSave": true,
+    "editor.rulers": [88],
+    "python.analysis.autoImportCompletions": true
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "charliermarsh.ruff",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "task.vscode-task",
+      "ms-azuretools.vscode-docker"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "🖥️ Dev stack up (hot reload)",
+        "type": "shell",
+        "command": "task dev",
+        "options": { "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}" },
+        "group": "build",
+        "isBackground": true
+      },
+      {
+        "label": "🖥️ Dev stack down",
+        "type": "shell",
+        "command": "task dev:down",
+        "options": { "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}" }
+      },
+      {
+        "label": "🧪 API tests",
+        "type": "shell",
+        "command": "task api:test",
+        "options": { "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}" },
+        "group": "test"
+      },
+      {
+        "label": "🧪 Display client tests",
+        "type": "shell",
+        "command": "task test",
+        "options": { "cwd": "${workspaceFolder:📟 Display Client (Pi)}" },
+        "group": "test"
+      },
+      {
+        "label": "📟 Deploy to display (prompted)",
+        "type": "shell",
+        "command": "task deploy -- ${input:displayHost}",
+        "options": { "cwd": "${workspaceFolder:📟 Display Client (Pi)}" }
+      }
+    ],
+    "inputs": [
+      {
+        "id": "displayHost",
+        "type": "promptString",
+        "description": "Display SSH target, e.g. pi@colorframe05.local"
+      }
+    ]
+  }
+}
