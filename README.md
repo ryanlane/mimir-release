@@ -10,8 +10,23 @@ the pinned release manifest, shared CI workflows, and the developer workspace.
 - `bootstrap.sh` — clones all component repos as siblings (one-command setup)
 - `versions.yml` — pinned versions per release channel (the release manifest)
 - `PLAN.md` — project review, deployment architecture, and roadmap
-- *(Phase 1, planned)* production `docker-compose.yml`, `mimir-update.timer`
-  systemd units, reusable GitHub Actions workflows
+- `deploy/` — production deployment bundle:
+  - `docker-compose.yml` — pinned GHCR images, no source checkout needed
+  - `install_server.sh` — one-shot idempotent server setup
+  - `mimir-update.sh` + `.service`/`.timer` — 15-minute self-update loop
+  - `mosquitto/mosquitto.conf` — authenticated LAN listener + anon localhost
+
+## Production server setup
+
+```bash
+sudo mkdir -p /opt/mimir && sudo chown $USER /opt/mimir
+git clone https://github.com/ryanlane/mimir-release.git /opt/mimir/mimir-release
+bash /opt/mimir/mimir-release/deploy/install_server.sh   # creates .env, exits
+vi /opt/mimir/mimir-release/deploy/.env                  # set PUBLIC_HOST etc.
+bash /opt/mimir/mimir-release/deploy/install_server.sh   # installs + starts
+```
+
+From then on the server converges to `versions.yml` every 15 minutes.
 
 ## New machine setup
 

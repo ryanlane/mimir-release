@@ -1,0 +1,148 @@
+name: mimir
+
+# Production compose — runs PINNED GHCR images, no source checkout needed.
+# Image tags come from ../versions.yml, rendered into .env.versions by
+# mimir-update.sh. Do not edit tags here; bump versions.yml instead.
+#
+# First-time setup: see install_server.sh. Manual operation:
+#   docker compose --env-file .env --env-file .env.versions up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mimir-db
+    environment:
+      POSTGRES_DB: mimir
+      POSTGRES_USER: mimir
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mimir -d mimir"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: mimir-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mimir-mqtt
+    network_mode: "host"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - mqtt_data:/mosquitto/data
+    restart: unless-stopped
+    healthcheck:
+      # Anonymous localhost-only listener; 1883 requires auth.
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1884", "-t", "health", "-m", "ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ghcr.io/ryanlane/mimir-api:${MIMIR_SERVER_TAG:?run mimir-update.sh}
+    container_name: mimir-api
+    network_mode: "host"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=5000
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - DB_URL=postgresql+psycopg2://mimir:${POSTGRES_PASSWORD}@127.0.0.1:5432/mimir
+      - REDIS_ENABLED=true
+      - REDIS_HOST=127.0.0.1
+      - REDIS_PORT=6379
+      # API uses the anonymous localhost listener; displays get 1883 + creds.
+      - MQTT_ENABLED=true
+      - MQTT_HOST=127.0.0.1
+      - MQTT_PORT=1884
+      - MDNS_DISCOVERY_ENABLED=false
+      - MDNS_EXTERNAL_FEED_ENABLED=true
+      - UPLOAD_DIR=/var/opt/mimir/mimir-api/uploads
+      - CHANNELS_DIR=/var/opt/mimir/mimir-api/channels
+      # From .env:
+      - PUBLIC_HOST
+      - PUBLIC_MDNS_HOST
+      - MQTT_PUBLIC_HOST
+      - MQTT_PUBLIC_PORT
+      - MQTT_USER
+      - MQTT_PASSWORD
+      - MQTT_EXPOSE_CREDENTIALS
+      - MIMIR_DISCOVERY_TOKEN=${MIMIR_DISCOVERY_TOKEN:-}
+      - MDNS_EXTERNAL_FEED_TOKEN=${MIMIR_DISCOVERY_TOKEN:-}
+      - CORS_ORIGINS_EXTRA
+    volumes:
+      # Persistent data lives outside the repo; survives image updates.
+      - ${MIMIR_DATA_DIR:-/opt/mimir/data}/uploads:/var/opt/mimir/mimir-api/uploads
+      # Channels: seeded from the image on install (install_server.sh), then
+      # persistent so user-installed channel plugins survive updates.
+      - ${MIMIR_DATA_DIR:-/opt/mimir/data}/channels:/var/opt/mimir/mimir-api/channels
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    restart: unless-stopped
+    command:
+      - sh
+      - -lc
+      - |
+        set -e
+        echo "--- Running database migrations ---"
+        alembic upgrade head
+        echo "--- Migrations complete, starting API ---"
+        exec uvicorn app.main:app --host 0.0.0.0 --port 5000
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: ghcr.io/ryanlane/mimir-web:${MIMIR_SERVER_TAG:?run mimir-update.sh}
+    container_name: mimir-web
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  discovery:
+    image: ghcr.io/ryanlane/mimir-discovery:${MIMIR_SERVER_TAG:?run mimir-update.sh}
+    container_name: mimir-discovery
+    # Host network so mDNS advertises the server's real LAN identity.
+    network_mode: "host"
+    environment:
+      - MIMIR_API_BASE=http://127.0.0.1:5000
+      - MIMIR_PUBLIC_HOSTNAME
+      - MIMIR_DISCOVERY_TOKEN=${MIMIR_DISCOVERY_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+  mqtt_data:

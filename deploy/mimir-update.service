@@ -1,0 +1,10 @@
+[Unit]
+Description=Mimir server self-update (pull release manifest, converge compose)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/mimir/mimir-release/deploy/mimir-update.sh
+# Don't pile up if a pull is slow
+TimeoutStartSec=15min
