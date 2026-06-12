@@ -8,8 +8,8 @@
 # (display-client). Placeholder values until Phase 1 CI is in place.
 
 stable:
-  server: v1.0.3 # one tag → api, web, discovery images (ghcr.io/ryanlane/mimir-*)
-  display-client: v1.0.4 # mimir-display release artifact
+  server: v1.0.4 # one tag → api, web, discovery images (ghcr.io/ryanlane/mimir-*)
+  display-client: v1.0.5 # mimir-display release artifact
 
 
 # Optional second channel for canary devices / a test server:
