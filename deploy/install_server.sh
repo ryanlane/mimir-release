@@ -54,7 +54,14 @@ if [ ! -f mosquitto/passwd ]; then
 fi
 
 # ---------- data dirs ----------
-mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/channels" "$DATA_DIR/client-releases"
+# Docker (root) may have created these as bind-mount mountpoints before we
+# did — repair ownership so the update script can write the release cache.
+mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/channels" "$DATA_DIR/client-releases" 2>/dev/null || true
+if [ ! -w "$DATA_DIR/client-releases" ]; then
+  warn "data dirs are root-owned (created by docker) — repairing ownership"
+  sudo mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/channels" "$DATA_DIR/client-releases"
+  sudo chown -R "$(id -u):$(id -g)" "$DATA_DIR"
+fi
 
 # ---------- first render + pull ----------
 bash ./mimir-update.sh || die "initial update failed — check versions.yml pins and GHCR access"
