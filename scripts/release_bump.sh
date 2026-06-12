@@ -144,7 +144,18 @@ print_dirty_tree() {
   status="$(git -C "$repo" status --short)"
   if [[ -n "$status" ]]; then
     info "DIRTY: $repo"
-    echo "$status" | sed 's/^/  /'
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      local path kind summary
+      path="${line:3}"
+      summary="$(git -C "$repo" diff --summary -- "$path" | head -n1 || true)"
+      if [[ "$summary" == mode\ change* ]]; then
+        kind="mode-change"
+      else
+        kind="content-change"
+      fi
+      echo "  $line [$kind]"
+    done <<< "$status"
   else
     info "CLEAN: $repo"
   fi
