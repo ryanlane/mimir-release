@@ -54,7 +54,7 @@ if [ ! -f mosquitto/passwd ]; then
 fi
 
 # ---------- data dirs ----------
-mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/channels"
+mkdir -p "$DATA_DIR/uploads" "$DATA_DIR/channels" "$DATA_DIR/client-releases"
 
 # ---------- first render + pull ----------
 bash ./mimir-update.sh || die "initial update failed — check versions.yml pins and GHCR access"

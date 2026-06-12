@@ -44,6 +44,33 @@ MIMIR_DISPLAY_VERSION=${DISPLAY_VERSION:-}
 EOF
 echo "[mimir-update] server=${SERVER_TAG} display-client=${DISPLAY_VERSION:-n/a}"
 
+# --- cache the pinned display-client artifact (Phase 2: LAN-served OTA) ---
+DATA_DIR_LINE="$(grep -E '^MIMIR_DATA_DIR=' .env 2>/dev/null | cut -d= -f2 || true)"
+DATA_DIR="${DATA_DIR_LINE:-/opt/mimir/data}"
+RELEASES_DIR="$DATA_DIR/client-releases"
+if [ -n "$DISPLAY_VERSION" ] && [ "$DISPLAY_VERSION" != "v0.0.0" ]; then
+  VERSION_DIR="$RELEASES_DIR/$DISPLAY_VERSION"
+  if [ ! -f "$VERSION_DIR/manifest.json" ]; then
+    echo "[mimir-update] caching display-client ${DISPLAY_VERSION}"
+    mkdir -p "$VERSION_DIR"
+    BASE_URL="https://github.com/ryanlane/mimir-display/releases/download/${DISPLAY_VERSION}"
+    PLAIN_VERSION="${DISPLAY_VERSION#v}"
+    if curl -fsSL -o "$VERSION_DIR/manifest.json.tmp" "$BASE_URL/manifest.json" \
+       && curl -fsSL -o "$VERSION_DIR/mimir_display-${PLAIN_VERSION}.tar.gz" "$BASE_URL/mimir_display-${PLAIN_VERSION}.tar.gz"; then
+      mv "$VERSION_DIR/manifest.json.tmp" "$VERSION_DIR/manifest.json"
+      # Relative symlink: the dir is bind-mounted into the API container at a
+      # different absolute path, so an absolute link would dangle there.
+      ln -sfn "$DISPLAY_VERSION" "$RELEASES_DIR/latest"
+      echo "[mimir-update] display-client ${DISPLAY_VERSION} cached"
+    else
+      rm -rf "$VERSION_DIR"
+      echo "[mimir-update] WARNING: could not download display-client ${DISPLAY_VERSION} (private repo or offline?); will retry next run"
+    fi
+  else
+    ln -sfn "$DISPLAY_VERSION" "$RELEASES_DIR/latest"
+  fi
+fi
+
 # --- converge ---
 docker compose --env-file .env --env-file .env.versions pull --quiet
 docker compose --env-file .env --env-file .env.versions up -d --remove-orphans

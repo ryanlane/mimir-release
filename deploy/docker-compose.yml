@@ -78,6 +78,7 @@ services:
       - MDNS_EXTERNAL_FEED_ENABLED=true
       - UPLOAD_DIR=/var/opt/mimir/mimir-api/uploads
       - CHANNELS_DIR=/var/opt/mimir/mimir-api/channels
+      - CLIENT_RELEASES_DIR=/var/opt/mimir/mimir-api/client-releases
       # From .env:
       - PUBLIC_HOST
       - PUBLIC_MDNS_HOST
@@ -95,6 +96,9 @@ services:
       # Channels: seeded from the image on install (install_server.sh), then
       # persistent so user-installed channel plugins survive updates.
       - ${MIMIR_DATA_DIR:-/opt/mimir/data}/channels:/var/opt/mimir/mimir-api/channels
+      # Cached display-client release artifacts (written by mimir-update.sh,
+      # served read-only at /api/client-releases/*).
+      - ${MIMIR_DATA_DIR:-/opt/mimir/data}/client-releases:/var/opt/mimir/mimir-api/client-releases:ro
     depends_on:
       db:
         condition: service_healthy
