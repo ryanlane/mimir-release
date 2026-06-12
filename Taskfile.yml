@@ -8,11 +8,16 @@ tasks:
       - task --list
 
   release:bump:
-    desc: Dry-run release bump helper (server/display patch)
+    desc: Release bump helper (defaults to dry-run; pass args after --)
     cmds:
-      - bash scripts/release_bump.sh
+      - bash scripts/release_bump.sh {{.CLI_ARGS}}
 
   release:bump:apply:
     desc: Apply release bump helper and push tags/manifest
     cmds:
       - bash scripts/release_bump.sh --apply
+
+  release:bump:force:
+    desc: Apply release bump helper even with dirty working trees
+    cmds:
+      - bash scripts/release_bump.sh --apply --allow-dirty

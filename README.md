@@ -68,6 +68,8 @@ changes.
 cd ~/projects/mimir/mimir-release
 task release:bump          # dry-run preview
 task release:bump:apply    # interactive apply
+task release:bump -- --apply
+task release:bump:force    # apply even if repos are dirty
 ```
 
 Direct script examples:
@@ -75,4 +77,12 @@ Direct script examples:
 ```bash
 bash scripts/release_bump.sh --server-bump minor --display-bump patch
 bash scripts/release_bump.sh --apply
+bash scripts/release_bump.sh --apply --allow-dirty
 ```
+
+Behavior note:
+
+- Dry-run can execute with dirty working trees (it prints warnings).
+- Apply mode requires clean working trees in all participating repos.
+- Use --allow-dirty (or task release:bump:force) only when you intentionally
+  want to tag current uncommitted state.

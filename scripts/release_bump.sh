@@ -31,6 +31,7 @@ DISPLAY_TAG_OVERRIDE=""
 APPLY=0
 ASSUME_YES=0
 NO_FETCH=0
+ALLOW_DIRTY=0
 
 usage() {
   cat <<'EOF'
@@ -44,6 +45,7 @@ Options:
   --server-tag <vX.Y.Z>     Explicit server tag (overrides --server-bump)
   --display-tag <vX.Y.Z>    Explicit display tag (overrides --display-bump)
   --apply                   Apply changes (default is dry run)
+  --allow-dirty             Allow apply mode with dirty working trees
   --yes                     Skip interactive confirmation (only used with --apply)
   --no-fetch                Skip git fetch --tags in component repos
   -h, --help                Show this help
@@ -52,6 +54,7 @@ Examples:
   scripts/release_bump.sh
   scripts/release_bump.sh --server-bump minor --display-bump patch
   scripts/release_bump.sh --apply
+  scripts/release_bump.sh --apply --allow-dirty
   scripts/release_bump.sh --server-tag v1.2.0 --display-tag v1.3.4 --apply
 EOF
 }
@@ -118,6 +121,13 @@ require_clean_tree() {
   local repo="$1"
   if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
     die "Working tree not clean: $repo"
+  fi
+}
+
+warn_if_dirty_tree() {
+  local repo="$1"
+  if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
+    info "WARNING: dirty working tree detected (dry-run allowed): $repo"
   fi
 }
 
@@ -215,6 +225,10 @@ while [[ $# -gt 0 ]]; do
       APPLY=1
       shift
       ;;
+    --allow-dirty)
+      ALLOW_DIRTY=1
+      shift
+      ;;
     --yes)
       ASSUME_YES=1
       shift
@@ -245,10 +259,19 @@ DISPLAY_REPO="$WORKSPACE_ROOT/mimir-display"
 [[ -d "$DISPLAY_REPO/.git" ]] || die "Missing repo: $DISPLAY_REPO"
 [[ -d "$RELEASE_REPO/.git" ]] || die "Missing git repo: $RELEASE_REPO"
 
-# Do not proceed if any participating repo has local changes.
-require_clean_tree "$SERVER_REPO"
-require_clean_tree "$DISPLAY_REPO"
-require_clean_tree "$RELEASE_REPO"
+# For safety, apply mode requires clean trees unless explicitly overridden.
+if [[ "$APPLY" -eq 1 && "$ALLOW_DIRTY" -eq 0 ]]; then
+  require_clean_tree "$SERVER_REPO"
+  require_clean_tree "$DISPLAY_REPO"
+  require_clean_tree "$RELEASE_REPO"
+else
+  if [[ "$APPLY" -eq 1 && "$ALLOW_DIRTY" -eq 1 ]]; then
+    info "WARNING: apply mode running with --allow-dirty"
+  fi
+  warn_if_dirty_tree "$SERVER_REPO"
+  warn_if_dirty_tree "$DISPLAY_REPO"
+  warn_if_dirty_tree "$RELEASE_REPO"
+fi
 
 if [[ "$NO_FETCH" -eq 0 ]]; then
   info "Fetching tags from remotes"
