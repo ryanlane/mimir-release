@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  release:bump:
+    desc: Dry-run release bump helper (server/display patch)
+    cmds:
+      - bash scripts/release_bump.sh
+
+  release:bump:apply:
+    desc: Apply release bump helper and push tags/manifest
+    cmds:
+      - bash scripts/release_bump.sh --apply

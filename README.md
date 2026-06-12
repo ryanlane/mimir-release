@@ -39,15 +39,15 @@ code mimir-release/mimir.code-workspace
 
 ## Component repos
 
-| Folder | Repo | What |
-|---|---|---|
-| `mimir-server` | ryanlane/Mimir-Platform | FastAPI API + React UI + discovery + compose |
-| `mimir-display` | ryanlane/mimir-display | Raspberry Pi display client (Inky / HyperPixel / HDMI / RGB matrix) |
-| `mimir-display-electron` | ryanlane/mimir-display-electron | Electron display client |
-| `mimir-display-magtag` | ryanlane/magtag-circuitpython-display-mimir | MagTag CircuitPython client |
-| `mimir-channel-photoframe` | ryanlane/image-frame-channel-mimir | Photo frame channel plugin |
-| `mimir-channel-spotify` | ryanlane/spotify-status | Spotify status channel plugin |
-| `mimir-docs` | ryanlane/mimir-documentation | Platform documentation |
+| Folder                     | Repo                                        | What                                                                |
+| -------------------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| `mimir-server`             | ryanlane/Mimir-Platform                     | FastAPI API + React UI + discovery + compose                        |
+| `mimir-display`            | ryanlane/mimir-display                      | Raspberry Pi display client (Inky / HyperPixel / HDMI / RGB matrix) |
+| `mimir-display-electron`   | ryanlane/mimir-display-electron             | Electron display client                                             |
+| `mimir-display-magtag`     | ryanlane/magtag-circuitpython-display-mimir | MagTag CircuitPython client                                         |
+| `mimir-channel-photoframe` | ryanlane/image-frame-channel-mimir          | Photo frame channel plugin                                          |
+| `mimir-channel-spotify`    | ryanlane/spotify-status                     | Spotify status channel plugin                                       |
+| `mimir-docs`               | ryanlane/mimir-documentation                | Platform documentation                                              |
 
 ## Releasing (target state, Phase 1+)
 
@@ -57,3 +57,22 @@ code mimir-release/mimir.code-workspace
    then rolls the matching display-client release out to the fleet over MQTT.
 
 Rollback = revert the pin-bump PR.
+
+## Release automation helper
+
+This repo includes a guarded helper that can read the latest tags, compute
+the next versions, update `versions.yml`, and (optionally) push tags + manifest
+changes.
+
+```bash
+cd ~/projects/mimir/mimir-release
+task release:bump          # dry-run preview
+task release:bump:apply    # interactive apply
+```
+
+Direct script examples:
+
+```bash
+bash scripts/release_bump.sh --server-bump minor --display-bump patch
+bash scripts/release_bump.sh --apply
+```
