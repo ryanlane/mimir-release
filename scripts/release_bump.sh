@@ -32,6 +32,7 @@ APPLY=0
 ASSUME_YES=0
 NO_FETCH=0
 ALLOW_DIRTY=0
+SHOW_DIRTY=0
 
 usage() {
   cat <<'EOF'
@@ -46,6 +47,7 @@ Options:
   --display-tag <vX.Y.Z>    Explicit display tag (overrides --display-bump)
   --apply                   Apply changes (default is dry run)
   --allow-dirty             Allow apply mode with dirty working trees
+  --show-dirty              Print dirty-file details for participating repos and exit
   --yes                     Skip interactive confirmation (only used with --apply)
   --no-fetch                Skip git fetch --tags in component repos
   -h, --help                Show this help
@@ -53,6 +55,7 @@ Options:
 Examples:
   scripts/release_bump.sh
   scripts/release_bump.sh --server-bump minor --display-bump patch
+  scripts/release_bump.sh --show-dirty
   scripts/release_bump.sh --apply
   scripts/release_bump.sh --apply --allow-dirty
   scripts/release_bump.sh --server-tag v1.2.0 --display-tag v1.3.4 --apply
@@ -119,8 +122,12 @@ latest_semver_tag() {
 
 require_clean_tree() {
   local repo="$1"
-  if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
-    die "Working tree not clean: $repo"
+  local status
+  status="$(git -C "$repo" status --short)"
+  if [[ -n "$status" ]]; then
+    echo "[ERR] Working tree not clean: $repo" >&2
+    echo "$status" | sed 's/^/[ERR]   /' >&2
+    die "Commit, stash, or discard changes in $(basename "$repo") before --apply"
   fi
 }
 
@@ -128,6 +135,18 @@ warn_if_dirty_tree() {
   local repo="$1"
   if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
     info "WARNING: dirty working tree detected (dry-run allowed): $repo"
+  fi
+}
+
+print_dirty_tree() {
+  local repo="$1"
+  local status
+  status="$(git -C "$repo" status --short)"
+  if [[ -n "$status" ]]; then
+    info "DIRTY: $repo"
+    echo "$status" | sed 's/^/  /'
+  else
+    info "CLEAN: $repo"
   fi
 }
 
@@ -229,6 +248,10 @@ while [[ $# -gt 0 ]]; do
       ALLOW_DIRTY=1
       shift
       ;;
+    --show-dirty)
+      SHOW_DIRTY=1
+      shift
+      ;;
     --yes)
       ASSUME_YES=1
       shift
@@ -258,6 +281,13 @@ DISPLAY_REPO="$WORKSPACE_ROOT/mimir-display"
 [[ -d "$SERVER_REPO/.git" ]] || die "Missing repo: $SERVER_REPO"
 [[ -d "$DISPLAY_REPO/.git" ]] || die "Missing repo: $DISPLAY_REPO"
 [[ -d "$RELEASE_REPO/.git" ]] || die "Missing git repo: $RELEASE_REPO"
+
+if [[ "$SHOW_DIRTY" -eq 1 ]]; then
+  print_dirty_tree "$SERVER_REPO"
+  print_dirty_tree "$DISPLAY_REPO"
+  print_dirty_tree "$RELEASE_REPO"
+  exit 0
+fi
 
 # For safety, apply mode requires clean trees unless explicitly overridden.
 if [[ "$APPLY" -eq 1 && "$ALLOW_DIRTY" -eq 0 ]]; then

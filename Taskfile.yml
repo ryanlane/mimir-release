@@ -21,3 +21,8 @@ tasks:
     desc: Apply release bump helper even with dirty working trees
     cmds:
       - bash scripts/release_bump.sh --apply --allow-dirty
+
+  release:dirty:
+    desc: Show dirty file details in release-related repos
+    cmds:
+      - bash scripts/release_bump.sh --show-dirty

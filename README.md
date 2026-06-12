@@ -70,6 +70,7 @@ task release:bump          # dry-run preview
 task release:bump:apply    # interactive apply
 task release:bump -- --apply
 task release:bump:force    # apply even if repos are dirty
+task release:dirty         # list dirty files causing apply blocks
 ```
 
 Direct script examples:
