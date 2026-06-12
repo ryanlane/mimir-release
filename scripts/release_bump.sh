@@ -148,8 +148,9 @@ print_dirty_tree() {
       [[ -z "$line" ]] && continue
       local path kind summary
       path="${line:3}"
+      # --summary lines are indented (" mode change 100644 => 100755 ...")
       summary="$(git -C "$repo" diff --summary -- "$path" | head -n1 || true)"
-      if [[ "$summary" == mode\ change* ]]; then
+      if [[ "$summary" == *"mode change"* ]]; then
         kind="mode-change"
       else
         kind="content-change"
