@@ -180,6 +180,32 @@ ensure_tag_not_exists_local() {
   fi
 }
 
+sync_display_pyproject() {
+  local repo="$1"
+  local version="$2"
+  local file="$repo/pyproject.toml"
+
+  [[ -f "$file" ]] || die "pyproject.toml not found in $repo"
+
+  local current
+  current="$(sed -nE 's/^version = "([^"]+)"$/\1/p' "$file" | head -n1)"
+  [[ -n "$current" ]] || die "Could not find project version in $file"
+
+  if [[ "$current" == "$version" ]]; then
+    info "pyproject.toml already at $version; skipping bump commit"
+    return 0
+  fi
+
+  sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"$version\"/" "$file"
+
+  local updated
+  updated="$(sed -nE 's/^version = "([^"]+)"$/\1/p' "$file" | head -n1)"
+  [[ "$updated" == "$version" ]] || die "Failed to update version in $file"
+
+  git -C "$repo" add pyproject.toml
+  git -C "$repo" commit -m "chore: bump version to $version"
+}
+
 update_versions_file() {
   local file="$1"
   local channel="$2"
@@ -352,6 +378,7 @@ cat <<EOF
 Release plan (channel: $CHANNEL)
 - mimir-server:  $CURRENT_SERVER_TAG -> $NEXT_SERVER_TAG
 - mimir-display: $CURRENT_DISPLAY_TAG -> $NEXT_DISPLAY_TAG
+- pyproject:     mimir-display/pyproject.toml version -> ${NEXT_DISPLAY_TAG#v} (committed before tagging)
 - versions file: $VERSIONS_FILE
 - mode:          $([[ "$APPLY" -eq 1 ]] && echo "APPLY" || echo "DRY RUN")
 
@@ -373,6 +400,9 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
   esac
 fi
 
+info "Syncing mimir-display pyproject.toml to ${NEXT_DISPLAY_TAG#v}"
+sync_display_pyproject "$DISPLAY_REPO" "${NEXT_DISPLAY_TAG#v}"
+
 info "Creating annotated tags"
 git -C "$SERVER_REPO" tag -a "$NEXT_SERVER_TAG" -m "mimir-server $NEXT_SERVER_TAG"
 git -C "$DISPLAY_REPO" tag -a "$NEXT_DISPLAY_TAG" -m "mimir-display $NEXT_DISPLAY_TAG"
@@ -383,6 +413,9 @@ update_versions_file "$VERSIONS_FILE" "$CHANNEL" "$NEXT_SERVER_TAG" "$NEXT_DISPL
 info "Committing versions.yml in mimir-release"
 git -C "$RELEASE_REPO" add versions.yml
 git -C "$RELEASE_REPO" commit -m "release: bump $CHANNEL to server $NEXT_SERVER_TAG and display-client $NEXT_DISPLAY_TAG"
+
+info "Pushing mimir-display branch (version bump commit)"
+git -C "$DISPLAY_REPO" push origin HEAD
 
 info "Pushing tags"
 git -C "$SERVER_REPO" push origin "$NEXT_SERVER_TAG"

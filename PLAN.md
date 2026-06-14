@@ -115,15 +115,18 @@ Full fleet platforms add device-agent infrastructure, image-based OS updates, an
 
 ## 4. Phased roadmap
 
-| Phase | Work | Outcome |
-|-------|------|---------|
-| **0 — Quick wins** (hours) | Items 5–7: MQTT auth, localhost-bind DB/Redis/pgAdmin, rotate creds *(items 8, 9, 11 done in reorg)* | Safe LAN defaults, cleaner repo |
-| **1 — CI + server auto-update** (1–2 days) | §3.1 + §3.2: per-repo Actions + `mimir-release` repo, GHCR multi-arch images, compose on pinned tags, update timer, discovery into compose | pin-bump PR → server updates itself |
-| **2 — Client versioning** (1 day) | Version in presence, fleet panel in UI, server-side release cache endpoint | Know what's deployed where |
-| **3 — Client OTA** (2–4 days) | Update agent, A/B install + rollback, desired-version topic, canary group | One tag updates server **and** all displays |
-| **4 — Consolidation** (ongoing) | Items 10, 12–13: docs collapse, api layer consolidation, test growth gated in CI | Sustainable codebase |
+| Phase | Work | Status |
+|-------|------|--------|
+| **0 — Quick wins** | MQTT auth (dual listener: 1883 LAN auth / 1884 localhost anon), localhost-bind DB/Redis/pgAdmin, generated secrets | ✅ **Done 2026-06-11** (`scripts/phase0_harden.sh`) |
+| **1 — CI + server auto-update** | Per-repo Actions → GHCR multi-arch images; `deploy/` bundle (pinned compose, `mimir-update.timer`, installer); discovery in compose | ✅ **Done 2026-06-11** — live on the production server |
+| **2 — Client versioning** | `client_version`/`protocol_version` in presence + registration, version on display cards, `/api/client-releases/*` cache endpoints, artifact caching in `mimir-update.sh` | ✅ **Done 2026-06-11** |
+| **3 — Client OTA** | Retained `mimir/fleet/desired_version` + canary auto-promotion (server `fleet_rollout.py`); client request-file trigger; root path-unit updater with A/B installs, health check, rollback; status in UI | ✅ **Built 2026-06-12** — rolling out |
+| **4 — Consolidation** | See §7 | 🔶 In progress (§7.A done 2026-06-12) |
 
-Phases 0–2 are independent of each other and each immediately useful; 3 depends on 1–2.
+Operational notes that postdate the original plan: release flow is automated by
+`scripts/release_bump.sh` (`task release:bump:apply`); GHCR packages are private
+(PAT login required for root *and* the admin user on the server); all repos run
+`core.fileMode false` because Windows-side/UNC edits strip exec bits.
 
 ---
 
@@ -172,4 +175,62 @@ Open the workspace via `code mimir-release/mimir.code-workspace`. New machine se
 ### Optional follow-ups
 
 - Rename GitHub repos to match local names (`Mimir-Platform` → `mimir-server`, etc.). Old URLs redirect; update `bootstrap.sh` URLs after renaming.
-- Create the `mimir-release` repo on GitHub and push.
+- ~~Create the `mimir-release` repo on GitHub and push.~~ Done.
+
+---
+
+## 7. Remaining work (Phase 4 + accumulated items)
+
+Ordered roughly by value-for-effort. None block daily operation; all improve
+long-term maintainability.
+
+### A. Code consolidation (mimir-api) — ✅ **Done 2026-06-12**
+`app/core/services/` and `app/infrastructure/` are dissolved:
+- Live modules (`scene_service`, `display_scene_service`,
+  `discovered_display_manager`) moved into `app/services/`.
+- Dead code deleted: `channel_service.py` and `display_service.py` (mapped
+  DB columns that no longer exist; only reachable via never-called DI
+  factories), the duplicate websocket manager, the duplicate DB models/engine
+  (`app/infrastructure/database/`), and `infrastructure/channels/manager.py`.
+- DI now flows through `app.db.session.get_session` everywhere;
+  `app/dependencies.py` shrank to the one factory actually used
+  (`get_scene_service`). `app/core/` retains only cross-cutting modules
+  (logging, metrics, scheduler, middleware, security).
+- Verified: full test suite (87) green, ruff clean, app boots.
+
+### B. Test growth, gated by the CI that now exists — 🔶 in progress
+Done 2026-06-12: fleet rollout phase logic (`fleet_rollout.py` — snapshot
+filtering, canary soak/promotion/regression, manifest loading, publish
+dedup; 15 tests) and the client's `ota.py` (skip rules, canary gating,
+failure backoff, presence fields; 18 tests). Display unpair endpoint also
+covered (4 integration tests).
+Remaining priorities: scene refresh pipeline (`scene_refresh_service` — it
+has bitten twice: reload-loop, hairpin URL) and the display
+registration/pairing state machine.
+
+### C. Docs consolidation
+- `mimir-docs/` is frozen at v2.4/Aug 2025 and contradicts current reality
+  (repo layout, deployment model, API surface). Either refresh it from the
+  current state or archive it and let per-repo READMEs + this PLAN be the docs.
+- ~~Stale references to deleted helpers (e.g. Taskfile `api:test` calling the
+  removed `run_tests.py`)~~ — done 2026-06-12: Taskfile `api:test*` targets,
+  `dev.sh`, `README.md`, and `TESTING.md` now invoke pytest directly (CI
+  parity); `pytest-cov` added to dev extras for the coverage target.
+
+### D. Fleet/OTA hardening (post-Phase-3 polish)
+- Per-display "update now" / "hold" controls in the UI (manual override of
+  the auto rollout); requires a per-device command alongside the fleet topic.
+- Update history per display (the server only keeps last status today).
+- `min_server_version` enforcement (manifest field exists; nothing checks it).
+- MagTag/Electron clients: out of OTA scope by decision §5.2 — revisit if they
+  see real use.
+
+### E. Odds and ends
+- mimir-api `deployment-manager`, `channels/photo_frame/` gitignore entries and
+  other legacy ignore rules: audit `.gitignore` files (the `__init__.py`
+  blanket-ignore shipped a broken release — there may be more lurking).
+- pgAdmin/`tools` profile absent from the production bundle (decide: add behind
+  profile or document the SSH-tunnel + dev-compose alternative).
+- Channel plugin install story for production (today: drop files into
+  `/opt/mimir/data/channels/`; eventually: in-UI install from the
+  `mimir-channel-*` repos).
