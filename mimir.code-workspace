@@ -31,6 +31,14 @@
     {
       "name": "📚 Docs",
       "path": "../mimir-docs"
+    },
+    {
+      "name": "🎬 Channel: Slow Movie",
+      "path": "../mimir-slow-movie"
+    },
+    {
+      "name": "🧩 Plugin Registry",
+      "path": "../mimir-plugin-registry"
     }
   ],
   "settings": {
@@ -55,7 +63,9 @@
       "**/data/uploads/**": true
     },
     "editor.formatOnSave": true,
-    "editor.rulers": [88],
+    "editor.rulers": [
+      88
+    ],
     "python.analysis.autoImportCompletions": true
   },
   "extensions": {
@@ -75,7 +85,9 @@
         "label": "🖥️ Dev stack up (hot reload)",
         "type": "shell",
         "command": "task dev",
-        "options": { "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}" },
+        "options": {
+          "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}"
+        },
         "group": "build",
         "isBackground": true
       },
@@ -83,27 +95,35 @@
         "label": "🖥️ Dev stack down",
         "type": "shell",
         "command": "task dev:down",
-        "options": { "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}" }
+        "options": {
+          "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}"
+        }
       },
       {
         "label": "🧪 API tests",
         "type": "shell",
         "command": "task api:test",
-        "options": { "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}" },
+        "options": {
+          "cwd": "${workspaceFolder:🖥️ Server (API · Web · Discovery)}"
+        },
         "group": "test"
       },
       {
         "label": "🧪 Display client tests",
         "type": "shell",
         "command": "task test",
-        "options": { "cwd": "${workspaceFolder:📟 Display Client (Pi)}" },
+        "options": {
+          "cwd": "${workspaceFolder:📟 Display Client (Pi)}"
+        },
         "group": "test"
       },
       {
         "label": "📟 Deploy to display (prompted)",
         "type": "shell",
         "command": "task deploy -- ${input:displayHost}",
-        "options": { "cwd": "${workspaceFolder:📟 Display Client (Pi)}" }
+        "options": {
+          "cwd": "${workspaceFolder:📟 Display Client (Pi)}"
+        }
       }
     ],
     "inputs": [
