@@ -21,20 +21,24 @@
       "path": "../mimir-display-magtag"
     },
     {
-      "name": "📸 Channel: Photo Frame",
+      "name": "📚 Sources · Photo Frame",
       "path": "../mimir-channel-photoframe"
     },
     {
-      "name": "🎵 Channel: Spotify",
+      "name": "📚 Sources · Slow Movie",
+      "path": "../mimir-slow-movie"
+    },
+    {
+      "name": "📚 Sources · Spotify",
       "path": "../mimir-channel-spotify"
+    },
+    {
+      "name": "📚 Sources · Comic Covers",
+      "path": "../mimir-source-comic-covers"
     },
     {
       "name": "📚 Docs",
       "path": "../mimir-docs"
-    },
-    {
-      "name": "🎬 Channel: Slow Movie",
-      "path": "../mimir-slow-movie"
     },
     {
       "name": "🧩 Plugin Registry",
