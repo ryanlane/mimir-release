@@ -36,6 +36,10 @@
       "name": "📚 Sources · Comic Covers",
       "path": "../mimir-source-comic-covers"
     },
+        {
+      "name": "📚 Sources · Movie Posters",
+      "path": "../mimir-source-movie-posters"
+    },
     {
       "name": "📚 Docs",
       "path": "../mimir-docs"
