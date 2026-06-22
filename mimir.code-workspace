@@ -43,6 +43,10 @@
     {
       "name": "📚 Sources · Weather",
       "path": "../mimir-source-weather"
+    }, 
+        {
+      "name": "📚 Sources · Headlines",
+      "path": "../mimir-source-headlines"
     },    
     {
       "name": "📚 Docs",
