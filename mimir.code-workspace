@@ -47,7 +47,15 @@
         {
       "name": "📚 Sources · Headlines",
       "path": "../mimir-source-headlines"
-    },    
+    },
+    {
+      "name": "📚 Sources · MetArt",
+      "path": "../mimir-source-metart"
+    },
+    {
+      "name": "📚 Sources · Last.fm",
+      "path": "../mimir-source-lastfm"
+    },          
     {
       "name": "📚 Docs",
       "path": "../mimir-docs"
