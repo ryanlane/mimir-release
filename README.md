@@ -22,9 +22,14 @@ the pinned release manifest, shared CI workflows, and the developer workspace.
 sudo mkdir -p /opt/mimir && sudo chown $USER /opt/mimir
 git clone https://github.com/ryanlane/mimir-release.git /opt/mimir/mimir-release
 bash /opt/mimir/mimir-release/deploy/install_server.sh   # creates .env, exits
-vi /opt/mimir/mimir-release/deploy/.env                  # set PUBLIC_HOST etc.
 bash /opt/mimir/mimir-release/deploy/install_server.sh   # installs + starts
 ```
+
+The server is then accessible at **http://mimir.local:8080** on your LAN — no IP
+address configuration required. Mimir advertises itself via mDNS automatically.
+
+If your network uses VLANs or mDNS doesn't reach your displays, set `PUBLIC_HOST`
+in `deploy/.env` to the server's LAN IP and re-run the installer.
 
 From then on the server converges to `versions.yml` every 15 minutes.
 
