@@ -73,7 +73,7 @@ fi
 
 # --- converge ---
 docker compose --env-file .env --env-file .env.versions pull --quiet
-docker compose --env-file .env --env-file .env.versions up -d --remove-orphans --force-recreate
+docker compose --env-file .env --env-file .env.versions up -d --remove-orphans
 
 # Clean up superseded images (keeps the currently-running ones).
 docker image prune -f >/dev/null
