@@ -21,6 +21,10 @@
       "path": "../mimir-display-magtag"
     },
     {
+      "name": "🔋 Display Client (Smart TV Ultra)",
+      "path": "../mimir-display-smartTV-ultra"
+    },
+    {
       "name": "📚 Sources · Photo Frame",
       "path": "../mimir-channel-photoframe"
     },
@@ -55,7 +59,11 @@
     {
       "name": "📚 Sources · Last.fm",
       "path": "../mimir-source-lastfm"
-    },          
+    },
+    {
+      "name": "📚 Sources · Media Player",
+      "path": "../mimir-source-mediaplayer"
+    },
     {
       "name": "📚 Docs",
       "path": "../mimir-docs"
