@@ -102,7 +102,10 @@
     "editor.rulers": [
       88
     ],
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "chat.tools.terminal.autoApprove": {
+      "pytest": true
+    }
   },
   "extensions": {
     "recommendations": [
