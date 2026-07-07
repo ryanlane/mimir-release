@@ -82,6 +82,14 @@ if [ -n "$STALE_CONTAINERS" ]; then
 fi
 
 docker compose --env-file .env --env-file .env.versions pull --quiet
+
+# Run database migrations explicitly before rolling out the new containers,
+# in a one-off container from the freshly pulled api image. The api container
+# also runs `alembic upgrade head` at boot as a safety net, but doing it here
+# makes migrations a visible, ordered deploy step with their own log output.
+echo "[mimir-update] running database migrations"
+docker compose --env-file .env --env-file .env.versions run --rm api alembic upgrade head
+
 docker compose --env-file .env --env-file .env.versions up -d --remove-orphans
 
 # Clean up superseded images (keeps the currently-running ones).

@@ -127,6 +127,11 @@ services:
     container_name: mimir-web
     ports:
       - "8080:80"
+    # nginx proxies /api, /ws and /media to the host-networked api via
+    # host.docker.internal — on plain Linux Docker that name only exists
+    # with this mapping (nginx exits at startup if it can't resolve it).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       api:
         condition: service_healthy
