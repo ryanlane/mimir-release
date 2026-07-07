@@ -72,6 +72,15 @@ if [ -n "$DISPLAY_VERSION" ] && [ "$DISPLAY_VERSION" != "v0.0.0" ]; then
 fi
 
 # --- converge ---
+# An interrupted `compose up` can leave the old container behind under its
+# recreate temp name (<containerid>_mimir-*); every later run then aborts
+# with "container name already in use". Sweep those leftovers first.
+STALE_CONTAINERS=$(docker ps -a --format '{{.Names}}' | grep -E '^[0-9a-f]{12}_mimir-' || true)
+if [ -n "$STALE_CONTAINERS" ]; then
+  echo "[mimir-update] removing stale recreate leftovers: ${STALE_CONTAINERS//$'\n'/ }"
+  echo "$STALE_CONTAINERS" | xargs -r docker rm -f >/dev/null
+fi
+
 docker compose --env-file .env --env-file .env.versions pull --quiet
 docker compose --env-file .env --env-file .env.versions up -d --remove-orphans
 
