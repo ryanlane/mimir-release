@@ -25,6 +25,10 @@
       "path": "../mimir-display-smartTV-ultra"
     },
     {
+      "name": "🔋 Display Client (Windows Native)",
+      "path": "C:\\Users\\futil\\projects\\Mimir\\mimir-display-win"
+    },
+    {
       "name": "📚 Sources · Photo Frame",
       "path": "../mimir-channel-photoframe"
     },
