@@ -5,3 +5,4 @@ Thumbs.db
 deploy/.env
 deploy/.env.versions
 deploy/mosquitto/passwd
+mimir.code-workspace
