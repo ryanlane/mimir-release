@@ -7,7 +7,10 @@ set -euo pipefail
 #
 # What it does:
 # - reads latest semantic tags from sibling repos
-# - computes next versions (patch/minor/major)
+# - checks whether each repo actually has commits since its last tag; a
+#   component with nothing new is skipped (bump downgraded to "none") so
+#   running this doesn't publish a redundant, byte-identical release
+# - computes next versions (patch/minor/major) for components that changed
 # - updates versions.yml (stable channel by default)
 # - creates annotated tags
 # - commits versions.yml
@@ -33,6 +36,7 @@ ASSUME_YES=0
 NO_FETCH=0
 ALLOW_DIRTY=0
 SHOW_DIRTY=0
+FORCE_UNCHANGED=0
 
 usage() {
   cat <<'EOF'
@@ -48,9 +52,15 @@ Options:
   --apply                   Apply changes (default is dry run)
   --allow-dirty             Allow apply mode with dirty working trees
   --show-dirty              Print dirty-file details for participating repos and exit
+  --force-unchanged         Bump/tag a component even if it has no commits since its last tag
   --yes                     Skip interactive confirmation (only used with --apply)
   --no-fetch                Skip git fetch --tags in component repos
   -h, --help                Show this help
+
+A component with no commits since its currently-tagged commit is skipped
+(treated as bump=none) unless you pass an explicit --server-tag/--display-tag
+or --force-unchanged. This avoids tagging + publishing a release that's
+byte-identical to the last one just because the other component changed.
 
 Examples:
   scripts/release_bump.sh
@@ -58,6 +68,7 @@ Examples:
   scripts/release_bump.sh --show-dirty
   scripts/release_bump.sh --apply
   scripts/release_bump.sh --apply --allow-dirty
+  scripts/release_bump.sh --apply --force-unchanged
   scripts/release_bump.sh --server-tag v1.2.0 --display-tag v1.3.4 --apply
 EOF
 }
@@ -118,6 +129,38 @@ latest_semver_tag() {
   else
     echo "$tag"
   fi
+}
+
+# True (exit 0) if $repo's checked-out HEAD has commits beyond what $tag
+# points at — i.e. there's actually something new to release. The synthetic
+# "v0.0.0" sentinel (no tags yet) always counts as changed. Resolution
+# failures fail open (treated as "changed") so a git hiccup here can never
+# silently block a real release.
+repo_changed_since_tag() {
+  local repo="$1"
+  local tag="$2"
+
+  [[ "$tag" == "v0.0.0" ]] && return 0
+
+  local tag_commit head_commit
+  tag_commit="$(git -C "$repo" rev-parse -q --verify "refs/tags/${tag}^{commit}")" || return 0
+  head_commit="$(git -C "$repo" rev-parse HEAD)"
+
+  [[ "$tag_commit" != "$head_commit" ]]
+}
+
+# Human-readable "N commits since <tag>" for the release-plan printout.
+commits_since_tag() {
+  local repo="$1"
+  local tag="$2"
+
+  if [[ "$tag" == "v0.0.0" ]]; then
+    echo "no prior tag"
+    return
+  fi
+  local count
+  count="$(git -C "$repo" rev-list --count "${tag}..HEAD" 2>/dev/null || echo "?")"
+  echo "${count} commit(s) since ${tag}"
 }
 
 require_clean_tree() {
@@ -290,6 +333,10 @@ while [[ $# -gt 0 ]]; do
       SHOW_DIRTY=1
       shift
       ;;
+    --force-unchanged)
+      FORCE_UNCHANGED=1
+      shift
+      ;;
     --yes)
       ASSUME_YES=1
       shift
@@ -350,34 +397,66 @@ fi
 CURRENT_SERVER_TAG="$(latest_semver_tag "$SERVER_REPO")"
 CURRENT_DISPLAY_TAG="$(latest_semver_tag "$DISPLAY_REPO")"
 
+# Effective bump type, possibly downgraded to "none" below if the repo has
+# nothing new since its current tag. Kept separate from $SERVER_BUMP/
+# $DISPLAY_BUMP so messages can still say what was actually requested.
+EFFECTIVE_SERVER_BUMP="$SERVER_BUMP"
+EFFECTIVE_DISPLAY_BUMP="$DISPLAY_BUMP"
+
+if [[ -z "$SERVER_TAG_OVERRIDE" ]] && [[ "$FORCE_UNCHANGED" -eq 0 ]] \
+   && ! repo_changed_since_tag "$SERVER_REPO" "$CURRENT_SERVER_TAG"; then
+  info "mimir-server: no commits since $CURRENT_SERVER_TAG — skipping bump (use --force-unchanged to override)"
+  EFFECTIVE_SERVER_BUMP="none"
+fi
+
+if [[ -z "$DISPLAY_TAG_OVERRIDE" ]] && [[ "$FORCE_UNCHANGED" -eq 0 ]] \
+   && ! repo_changed_since_tag "$DISPLAY_REPO" "$CURRENT_DISPLAY_TAG"; then
+  info "mimir-display: no commits since $CURRENT_DISPLAY_TAG — skipping bump (use --force-unchanged to override)"
+  EFFECTIVE_DISPLAY_BUMP="none"
+fi
+
 if [[ -n "$SERVER_TAG_OVERRIDE" ]]; then
   is_valid_semver_tag "$SERVER_TAG_OVERRIDE" || die "Invalid --server-tag value"
   NEXT_SERVER_TAG="$SERVER_TAG_OVERRIDE"
 else
-  NEXT_SERVER_TAG="$(bump_tag "$CURRENT_SERVER_TAG" "$SERVER_BUMP")"
+  NEXT_SERVER_TAG="$(bump_tag "$CURRENT_SERVER_TAG" "$EFFECTIVE_SERVER_BUMP")"
 fi
 
 if [[ -n "$DISPLAY_TAG_OVERRIDE" ]]; then
   is_valid_semver_tag "$DISPLAY_TAG_OVERRIDE" || die "Invalid --display-tag value"
   NEXT_DISPLAY_TAG="$DISPLAY_TAG_OVERRIDE"
 else
-  NEXT_DISPLAY_TAG="$(bump_tag "$CURRENT_DISPLAY_TAG" "$DISPLAY_BUMP")"
+  NEXT_DISPLAY_TAG="$(bump_tag "$CURRENT_DISPLAY_TAG" "$EFFECTIVE_DISPLAY_BUMP")"
 fi
 
 if [[ "$NEXT_SERVER_TAG" == "$CURRENT_SERVER_TAG" && "$NEXT_DISPLAY_TAG" == "$CURRENT_DISPLAY_TAG" ]]; then
-  die "No version change requested (both tags unchanged)"
+  die "Nothing to release: neither repo has commits since its last tag (server=$CURRENT_SERVER_TAG, display=$CURRENT_DISPLAY_TAG). Use --force-unchanged to tag anyway."
 fi
 
-ensure_tag_not_exists_local "$SERVER_REPO" "$NEXT_SERVER_TAG"
-ensure_tag_not_exists_local "$DISPLAY_REPO" "$NEXT_DISPLAY_TAG"
-ensure_tag_not_exists_remote "$SERVER_REPO" "$NEXT_SERVER_TAG"
-ensure_tag_not_exists_remote "$DISPLAY_REPO" "$NEXT_DISPLAY_TAG"
+# Whether each component actually has a new tag to create — false when it
+# was skipped above (unchanged) or explicitly requested as bump=none. Tag
+# existence checks/creation/push are skipped entirely in that case: the
+# "current" tag obviously already exists, so checking for it would only
+# ever (incorrectly) look like a collision.
+SERVER_TAG_CHANGED=0
+[[ "$NEXT_SERVER_TAG" != "$CURRENT_SERVER_TAG" ]] && SERVER_TAG_CHANGED=1
+DISPLAY_TAG_CHANGED=0
+[[ "$NEXT_DISPLAY_TAG" != "$CURRENT_DISPLAY_TAG" ]] && DISPLAY_TAG_CHANGED=1
+
+if [[ "$SERVER_TAG_CHANGED" -eq 1 ]]; then
+  ensure_tag_not_exists_local "$SERVER_REPO" "$NEXT_SERVER_TAG"
+  ensure_tag_not_exists_remote "$SERVER_REPO" "$NEXT_SERVER_TAG"
+fi
+if [[ "$DISPLAY_TAG_CHANGED" -eq 1 ]]; then
+  ensure_tag_not_exists_local "$DISPLAY_REPO" "$NEXT_DISPLAY_TAG"
+  ensure_tag_not_exists_remote "$DISPLAY_REPO" "$NEXT_DISPLAY_TAG"
+fi
 
 cat <<EOF
 
 Release plan (channel: $CHANNEL)
-- mimir-server:  $CURRENT_SERVER_TAG -> $NEXT_SERVER_TAG
-- mimir-display: $CURRENT_DISPLAY_TAG -> $NEXT_DISPLAY_TAG
+- mimir-server:  $CURRENT_SERVER_TAG -> $NEXT_SERVER_TAG  ($(commits_since_tag "$SERVER_REPO" "$CURRENT_SERVER_TAG"))
+- mimir-display: $CURRENT_DISPLAY_TAG -> $NEXT_DISPLAY_TAG  ($(commits_since_tag "$DISPLAY_REPO" "$CURRENT_DISPLAY_TAG"))
 - pyproject:     mimir-display/pyproject.toml version -> ${NEXT_DISPLAY_TAG#v} (committed before tagging)
 - versions file: $VERSIONS_FILE
 - mode:          $([[ "$APPLY" -eq 1 ]] && echo "APPLY" || echo "DRY RUN")
@@ -400,26 +479,53 @@ if [[ "$ASSUME_YES" -eq 0 ]]; then
   esac
 fi
 
-info "Syncing mimir-display pyproject.toml to ${NEXT_DISPLAY_TAG#v}"
-sync_display_pyproject "$DISPLAY_REPO" "${NEXT_DISPLAY_TAG#v}"
+if [[ "$DISPLAY_TAG_CHANGED" -eq 1 ]]; then
+  info "Syncing mimir-display pyproject.toml to ${NEXT_DISPLAY_TAG#v}"
+  sync_display_pyproject "$DISPLAY_REPO" "${NEXT_DISPLAY_TAG#v}"
+else
+  info "mimir-display unchanged — skipping pyproject.toml sync"
+fi
 
 info "Creating annotated tags"
-git -C "$SERVER_REPO" tag -a "$NEXT_SERVER_TAG" -m "mimir-server $NEXT_SERVER_TAG"
-git -C "$DISPLAY_REPO" tag -a "$NEXT_DISPLAY_TAG" -m "mimir-display $NEXT_DISPLAY_TAG"
+if [[ "$SERVER_TAG_CHANGED" -eq 1 ]]; then
+  git -C "$SERVER_REPO" tag -a "$NEXT_SERVER_TAG" -m "mimir-server $NEXT_SERVER_TAG"
+else
+  info "mimir-server unchanged — no new tag"
+fi
+if [[ "$DISPLAY_TAG_CHANGED" -eq 1 ]]; then
+  git -C "$DISPLAY_REPO" tag -a "$NEXT_DISPLAY_TAG" -m "mimir-display $NEXT_DISPLAY_TAG"
+else
+  info "mimir-display unchanged — no new tag"
+fi
 
 info "Updating versions.yml"
 update_versions_file "$VERSIONS_FILE" "$CHANNEL" "$NEXT_SERVER_TAG" "$NEXT_DISPLAY_TAG"
 
+# Build a commit message that only claims what actually changed.
+bump_summary=()
+[[ "$SERVER_TAG_CHANGED" -eq 1 ]] && bump_summary+=("server $NEXT_SERVER_TAG")
+[[ "$DISPLAY_TAG_CHANGED" -eq 1 ]] && bump_summary+=("display-client $NEXT_DISPLAY_TAG")
+bump_summary_joined=""
+for item in "${bump_summary[@]}"; do
+  if [[ -z "$bump_summary_joined" ]]; then
+    bump_summary_joined="$item"
+  else
+    bump_summary_joined="$bump_summary_joined and $item"
+  fi
+done
+
 info "Committing versions.yml in mimir-release"
 git -C "$RELEASE_REPO" add versions.yml
-git -C "$RELEASE_REPO" commit -m "release: bump $CHANNEL to server $NEXT_SERVER_TAG and display-client $NEXT_DISPLAY_TAG"
+git -C "$RELEASE_REPO" commit -m "release: bump $CHANNEL to $bump_summary_joined"
 
-info "Pushing mimir-display branch (version bump commit)"
-git -C "$DISPLAY_REPO" push origin HEAD
+if [[ "$DISPLAY_TAG_CHANGED" -eq 1 ]]; then
+  info "Pushing mimir-display branch (version bump commit)"
+  git -C "$DISPLAY_REPO" push origin HEAD
+fi
 
 info "Pushing tags"
-git -C "$SERVER_REPO" push origin "$NEXT_SERVER_TAG"
-git -C "$DISPLAY_REPO" push origin "$NEXT_DISPLAY_TAG"
+[[ "$SERVER_TAG_CHANGED" -eq 1 ]] && git -C "$SERVER_REPO" push origin "$NEXT_SERVER_TAG"
+[[ "$DISPLAY_TAG_CHANGED" -eq 1 ]] && git -C "$DISPLAY_REPO" push origin "$NEXT_DISPLAY_TAG"
 
 info "Pushing release repo commit"
 git -C "$RELEASE_REPO" push

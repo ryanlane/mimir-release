@@ -84,6 +84,7 @@ Direct script examples:
 bash scripts/release_bump.sh --server-bump minor --display-bump patch
 bash scripts/release_bump.sh --apply
 bash scripts/release_bump.sh --apply --allow-dirty
+bash scripts/release_bump.sh --apply --force-unchanged
 ```
 
 Behavior note:
@@ -92,3 +93,14 @@ Behavior note:
 - Apply mode requires clean working trees in all participating repos.
 - Use --allow-dirty (or task release:bump:force) only when you intentionally
   want to tag current uncommitted state.
+- Before computing a bump, the helper checks whether each repo (mimir-server,
+  mimir-display) actually has commits since the tag currently pinned in
+  `versions.yml`. A component with nothing new is automatically skipped
+  (its tag stays unchanged) rather than publishing a redundant,
+  byte-identical release — so running `task release:bump:apply` when only
+  the server changed will bump and tag *only* the server. Pass
+  `--force-unchanged` to bump/tag a component anyway (e.g. rebuilding after
+  a base-image security patch unrelated to app code). An explicit
+  `--server-tag`/`--display-tag` always wins regardless of git history.
+  `task release:bump:apply -- --force-unchanged` (or `release:bump:force`)
+  forwards extra flags through.

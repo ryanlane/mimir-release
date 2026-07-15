@@ -13,14 +13,14 @@ tasks:
       - bash scripts/release_bump.sh {{.CLI_ARGS}}
 
   release:bump:apply:
-    desc: Apply release bump helper and push tags/manifest
+    desc: Apply release bump helper and push tags/manifest (pass extra args after --)
     cmds:
-      - bash scripts/release_bump.sh --apply
+      - bash scripts/release_bump.sh --apply {{.CLI_ARGS}}
 
   release:bump:force:
-    desc: Apply release bump helper even with dirty working trees
+    desc: Apply release bump helper even with dirty working trees (pass extra args after --)
     cmds:
-      - bash scripts/release_bump.sh --apply --allow-dirty
+      - bash scripts/release_bump.sh --apply --allow-dirty {{.CLI_ARGS}}
 
   release:dirty:
     desc: Show dirty file details in release-related repos
