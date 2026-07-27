@@ -99,6 +99,10 @@ services:
       # Cached display-client release artifacts (written by mimir-update.sh,
       # served read-only at /api/client-releases/*).
       - ${MIMIR_DATA_DIR:-/opt/mimir/data}/client-releases:/var/opt/mimir/mimir-api/client-releases:ro
+      # Generic host media mount for File Sources (Settings -> File Sources).
+      # Set MIMIR_HOST_MEDIA in .env to a parent directory covering your
+      # media; named sources beneath it are configured in the web UI.
+      - ${MIMIR_HOST_MEDIA:-${MIMIR_DATA_DIR:-/opt/mimir/data}/media}:/mnt/host-media:ro
     depends_on:
       db:
         condition: service_healthy
