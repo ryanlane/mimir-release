@@ -9,7 +9,7 @@
 
 stable:
   server: v1.0.53 # one tag → api, web, discovery images (ghcr.io/ryanlane/mimir-*)
-  display-client: v1.0.49 # mimir-display release artifact
+  display-client: v1.0.50 # mimir-display release artifact
 
 
 # Optional second channel for canary devices / a test server:
