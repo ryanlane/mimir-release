@@ -78,6 +78,15 @@ if [ -f .env.versions ] && [ -z "$(ls -A "$DATA_DIR/channels" 2>/dev/null)" ]; t
 fi
 
 # ---------- systemd units ----------
+# mimir-update.service runs as root but this clone is owned by the install
+# user, so git refuses it as "dubious ownership" and every timed pull fails
+# (logged only as "git pull failed (offline?)"). Trust this one repo.
+REPO_DIR="$(cd .. && pwd)"
+if ! git config --system --get-all safe.directory 2>/dev/null | grep -qxF "$REPO_DIR"; then
+  info "marking $REPO_DIR as a git safe.directory for the root update service"
+  sudo git config --system --add safe.directory "$REPO_DIR"
+fi
+
 info "installing mimir-update systemd timer"
 sudo cp mimir-update.service mimir-update.timer /etc/systemd/system/
 sudo systemctl daemon-reload
